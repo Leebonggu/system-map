@@ -16,21 +16,24 @@ const driver = new neo4j.driver('bolt://localhost:7687', neo4j.auth.basic("neo4j
 router.get('/all', (req, res) => {
   const session = driver.session();
   session
-    .run(`MATCH(n) return n LIMIT 35`)
-    .then((result) => {
+    .run(`MATCH(n) return n`)
+    .then((nodes) => {
+      session.run(`MATCH p=()-[r]->() RETURN p`)
+      .then((relationships) => {
+        console.log(relationships.records[0]._fields);
+        const data = [];
+        nodes.records.forEach(record => {
+          data.push(record._fields[0]);
+        })
+        res.send(data);
+      });
       // records._fields
       // identity => id
       // labels => 대주제? 혹은 소주제 정도가 되겠는데, 근데 배열인 걸로 보면 여러개의 라벨을 가질 수 있겠어.
       // properties => 실질적인 값이 들어있어.
       // result.records.forEach((record) => console.log(record._fields[0].properties))
-      console.log(result.records[0]._fields);
-      const data = [];
-      result.records.forEach(record => {
-        console.log('record', record);
-        console.log('record_field', record._fields)
-        data.push(record._fields[0]);
-      })
-      res.send(data);
+      // console.log(result.records[0]._fields);
+      // console.log(result);
     })
     .catch((err) => {
       console.log(err);
@@ -42,7 +45,7 @@ router.post('/add', (req, res) => {
   session
     .run(`CREATE(n:${feild} {node: {nodeParam}, feild: {feildParam}}) RETURN n.node`, { nodeParam: node, feildParam: feild })
     .then((result) => {
-      console.log(result.records);
+      // console.log(result.records);
       session.close();
       res.send('success');
     })
@@ -50,6 +53,19 @@ router.post('/add', (req, res) => {
       console.log(err);
     })
 });
+
+router.delete('/delete', (req, res) => {
+  const session = driver.session();
+  const { identity, labels, properties } = req.body;
+  // `MATCH (n) WHERE id(n)=${identity} DELETE n`
+  session
+    .run(`MATCH (n {node: '${properties.node}'}) DETACH DELETE n`)
+    .then(() => {
+      res.send(properties);
+      session.close();
+    })
+    .catch(err => console.log(err));
+})
 
 router.post('/connection', (req, res) => {
   const session = driver.session();
