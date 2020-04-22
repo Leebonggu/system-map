@@ -1,6 +1,8 @@
 import React, { useState , useEffect, useRef } from 'react';
 import axios from 'axios';
 import styled from 'styled-components';
+import VisGraph from '../components/map/visjs-test';
+import VisReact from '../components/map/visjs';
 
 const Container = styled.div`
   flex: 1;
@@ -56,6 +58,7 @@ const NodesContainer = styled.div`
   display: flex;
   flex-wrap: wrap;
   margin: 1rem;
+  overflow: auto;
 `;
 
 const Node = styled.div`
@@ -77,7 +80,8 @@ const list = [
 ];
 
 function SystemMap() {
-  const [currentList, setCurrentList] = useState(null);
+  const [currentNodes, setCurrentNodes] = useState(null);
+  const [currentEdges, setCurrentEdges] = useState(null);
   const [node, setNode] = useState(''); // 
   const [feild, setFeild] = useState('경제');
   const [nodeAfield, setNodeAfeild] = useState('경제');
@@ -88,13 +92,15 @@ function SystemMap() {
   const [toggle, setToggle] = useState(false);
   const [connectStart, setConnectStart] = useState(false);
   const [nodeBox, setNodeBox] = useState([]);
-  const itemsRef = useRef([]);
+  // const itemsRef = useRef([]);
 
   useEffect(() =>{ 
     axios.get('/api/neo4j/all')
       .then(({ data }) => {
-        setCurrentList(data);
-        itemsRef.current = itemsRef.current.slice(0, data.length);
+        const { nodes, edges } = data;
+        setCurrentNodes(nodes);
+        setCurrentEdges(edges);
+        // itemsRef.current = itemsRef.current.slice(0, data.length);
       });
   }, []);
 
@@ -139,7 +145,7 @@ function SystemMap() {
       node,
       feild,
     };
-    const checkCurrentNode = currentList.filter((each) => (each.properties.node === node && each.properties.feild === feild));
+    const checkCurrentNode = currentNodes.filter((each) => (each.properties.node === node && each.properties.feild === feild));
     if (checkCurrentNode.length > 0) {
       alert(`이미 존재하는 값입니다. node: ${node}, field: ${feild}`);
       setNode('');
@@ -167,17 +173,19 @@ function SystemMap() {
       nodeAfield,
       nodeBfield,
       direction: direction >= 0 ? 'POSITIVE' : 'NEGATIVE',
+      power: direction,
     };
   
     initialize();
     axios.post('/api/neo4j/connection', data)
       .then(() => {
         console.log('connection success');
+        window.location.reload();
       })
       .catch(err => {console.log(err)});
   };
 
-  const handleeeee = (e) => {
+  const handleVariableClick = (e) => {
     e.preventDefault();
     let data;
     if (nodeBox.length === 2) {
@@ -216,8 +224,8 @@ function SystemMap() {
     if (window.confirm('정말 삭제할거야?')) {
       axios.delete('/api/neo4j/delete', { data: currentData })
         .then(({ data: deleted }) => {
-          const updatedList = currentList.filter((each) =>  (each.properties.node !== deleted.node));
-          setCurrentList(updatedList);
+          const updatedList = currentNodes.filter((each) =>  (each.properties.node !== deleted.node));
+          setCurrentNodes(updatedList);
         })
     }
   };
@@ -308,31 +316,41 @@ function SystemMap() {
             <StyledButton bg="red" fontColor="white" onClick={handleToggle}>{ toggle ? '노드삭제취소': '노드삭제'}</StyledButton>
           </FlexButtonContainer>
         </Forms>
-        <NodesContainer>{currentList && (
-          currentList.map((eactData, i) => {
-            return (
-              <Node
-                id={eactData.identity}
-                value={eactData.identity} 
-                onClick={() => connectStart && handleNodeBox(eactData)}
-              >    
-                {toggle && (
-                  <StyledButton
-                    bg="red"
-                    fontColor="white"
-                    onClick={(e) => handleRemoveNode(e, eactData)}
-                  >
-                    삭제
-                  </StyledButton>
-                )}          
-                {eactData.labels.map((label) => <>{label}</>)}
-                <div>
-                  {eactData.properties.node}
-                </div>
-              </Node>
-            )
-          })
-        )}</NodesContainer>
+        <NodesContainer>
+          {/* {currentNodes && (
+            currentNodes.map((eactData, i) => {
+              return (
+                <Node
+                  id={eactData.identity}
+                  value={eactData.identity} 
+                  onClick={() => connectStart && handleNodeBox(eactData)}
+                >    
+                  {toggle && (
+                    <StyledButton
+                      bg="red"
+                      fontColor="white"
+                      onClick={(e) => handleRemoveNode(e, eactData)}
+                    >
+                      삭제
+                    </StyledButton>
+                  )}          
+                  {eactData.labels.map((label) => <>{label}</>)}
+                  <div>
+                    {eactData.properties.node}
+                  </div>
+                </Node>
+              )
+            })
+          )} */}
+          {(currentNodes && currentEdges) ? (
+            <VisGraph
+              currentNodes={currentNodes}
+              currentEdges={currentEdges}
+            />
+          ) : (
+            'Loading'
+          )}
+        </NodesContainer>
         <Forms right>
           <FlexButtonContainer>
             <h2>변수 연결</h2>
@@ -340,7 +358,7 @@ function SystemMap() {
           </FlexButtonContainer>
           <StyledForm
             method="post"
-            onSubmit={handleeeee}
+            onSubmit={handleVariableClick}
           >
             <div>
               {nodeBox.map(((eachNode, i) => (

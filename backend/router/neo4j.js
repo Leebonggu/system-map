@@ -13,19 +13,28 @@ const neo4j = require('neo4j-driver');
 
 const driver = new neo4j.driver('bolt://localhost:7687', neo4j.auth.basic("neo4j", "1234"), { disableLosslessIntegers: true });
 
-router.get('/all', (req, res) => {
+router.get('/all', async (req, res) => {
   const session = driver.session();
   session
     .run(`MATCH(n) return n`)
     .then((nodes) => {
       session.run(`MATCH p=()-[r]->() RETURN p`)
       .then((relationships) => {
-        console.log(relationships.records[0]._fields);
-        const data = [];
+        // console.log('nodes', nodes);
+        // console.log('relations', relationships);
+        // console.log(relationships.records[0]._fields);
+        const allNodes = [];
+        const allEdges = [];
         nodes.records.forEach(record => {
-          data.push(record._fields[0]);
-        })
-        res.send(data);
+          allNodes.push(record._fields[0]);
+        });
+        relationships.records.forEach(record => {
+          allEdges.push(record._fields)
+        });
+        res.send({
+          nodes: allNodes,
+          edges: allEdges,
+        });
       });
       // records._fields
       // identity => id
@@ -74,7 +83,8 @@ router.post('/connection', (req, res) => {
     nodeB,
     nodeAfield,
     nodeBfield,
-    direction
+    direction,
+    power
   } = req.body;
   session
     .run(
